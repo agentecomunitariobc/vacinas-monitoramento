@@ -494,6 +494,7 @@ body{font-family:'Syne',sans-serif;background:var(--s50);color:var(--s800);font-
   .map-grid{grid-template-columns:1fr}
   .admin-hero{flex-direction:column}
   .topbar-stats{display:none}
+  .topbar-logout{display:none}
 }
 </style>
 </head>
@@ -581,6 +582,7 @@ body{font-family:'Syne',sans-serif;background:var(--s50);color:var(--s800);font-
   </div>
   <div class="sidebar-footer">
     <div class="sidebar-item" onclick="openCfg()"><span class="ico">⚙️</span> Meu perfil</div>
+    <div class="sidebar-item" onclick="doLogout();closeSidebar()" style="color:#f87171;margin-top:4px"><span class="ico">🚪</span> Sair</div>
   </div>
 </div>
 
