@@ -51,7 +51,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js">
-</script>
+</script><!-- ===== FIREBASE ===== --> <script type="module"> import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js'; import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'; import { getFirestore, doc, getDoc, setDoc, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js'; // ⬇ Cole aqui o firebaseConfig do seu projeto const firebaseConfig = { apiKey: "AIzaSy...", authDomain: "vacinacontrol.firebaseapp.com", projectId: "vacinacontrol", storageBucket: "vacinacontrol.appspot.com", messagingSenderId: "123456789", appId: "1:123:web:abc" }; const fbApp = initializeApp(firebaseConfig); const auth = getAuth(fbApp); const db = getFirestore(fbApp); // Persistência offline (IndexedDB) — essencial para PWA enableIndexedDbPersistence(db).catch(err => { if (err.code === 'failed-precondition') { console.warn('Firestore offline: múltiplas abas abertas'); } }); // Autenticação anônima — sem login extra para o usuário async function ensureAuth() { if (!auth.currentUser) await signInAnonymously(auth); } // ===== FUNÇÕES FIRESTORE (substituem localStorage) ===== async function loadUsers() { try { await ensureAuth(); const snap = await getDoc(doc(db, 'vacinacontrol', 'users')); if (snap.exists()) return snap.data().list; } catch (e) { console.warn('Firestore offline, usando localStorage', e); try { return JSON.parse(localStorage.getItem('vacinas_mu_users')) || DEFAULT_USERS; } catch { return DEFAULT_USERS; } } return DEFAULT_USERS; } async function saveUsers() { try { await ensureAuth(); await setDoc(doc(db, 'vacinacontrol', 'users'), { list: users }); localStorage.setItem('vacinas_mu_users', JSON.stringify(users)); // backup local } catch (e) { console.warn('saveUsers offline', e); } } async function loadUserData(uid) { try { await ensureAuth(); const snap = await getDoc(doc(db, 'vacinacontrol', 'data_' + uid)); if (snap.exists()) return snap.data().patients || []; } catch (e) { console.warn('loadUserData offline', e); try { return JSON.parse(localStorage.getItem('vacinas_mu_data_' + uid)) || []; } catch { return []; } } return []; } async function saveUserData(uid, data) { try { await ensureAuth(); await setDoc(doc(db, 'vacinacontrol', 'data_' + uid), { patients: data }); localStorage.setItem('vacinas_mu_data_' + uid, JSON.stringify(data)); // backup local } catch (e) { console.warn('saveUserData offline', e); } } function save() { saveUserData(currentUser.id, appData); } // Expõe funções para o escopo global (usadas pelo resto do app) window.loadUsers = loadUsers; window.saveUsers = saveUsers; window.loadUserData = loadUserData; window.saveUserData = saveUserData; window.save = save; // Inicia o app SOMENTE após autenticar signInAnonymously(auth).then(() => { initLoginScreen(); // substitui a chamada no fim do script original }); </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -841,18 +841,6 @@ let adminDetailPid = null;
 
 // ===================== UTILS =====================
 function getUserDataKey(uid) { return `vacinas_mu_data_${uid}`; }
-function loadUsers() {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || DEFAULT_USERS; }
-  catch(e){ return DEFAULT_USERS; }
-}
-function saveUsers() { localStorage.setItem(USERS_KEY, JSON.stringify(users)); }
-function loadUserData(uid) {
-  try { return JSON.parse(localStorage.getItem(getUserDataKey(uid))) || []; }
-  catch(e){ return []; }
-}
-function saveUserData(uid, data) { localStorage.setItem(getUserDataKey(uid), JSON.stringify(data)); }
-function save() { saveUserData(currentUser.id, appData); }
-
 function initials(name) { return name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
 function fmtDate(d) { if(!d) return '—'; try { return new Date(d+'T12:00:00').toLocaleDateString('pt-BR'); } catch(e){ return d; } }
 function addMonths(dob, m) {
@@ -1809,7 +1797,6 @@ function baixarTemplate() {
 }
 
 // ===================== INIT =====================
-initLoginScreen();
 </script>
 
 <!-- OFFLINE BAR -->
