@@ -587,7 +587,7 @@ body{font-family:'Syne',sans-serif;background:var(--s50);color:var(--s800);font-
 <!-- ===== PACIENTES ===== -->
 <div class="panel" id="tab-pacientes">
   <div class="card">
-    <div class="filter-bar">
+    <div class="filter-bar" id="patientsFilterBar">
       <input type="text" placeholder="🔍 Buscar nome ou código..." id="searchInp" oninput="renderPatients()" style="flex:1;min-width:180px">
       <select id="filterStatus" onchange="renderPatients()">
         <option value="">Todos</option>
@@ -599,7 +599,6 @@ body{font-family:'Syne',sans-serif;background:var(--s50);color:var(--s800);font-
     <div id="patientsList"></div>
   </div>
 </div>
-
 <!-- ===== CADASTRAR ===== -->
 <div class="panel" id="tab-cadastrar">
   <div class="card">
@@ -1175,65 +1174,75 @@ function renderPatients() {
 
 // ===================== PATIENT DETAIL =====================
 function openPatientDetail(pid) {
-  detailPid=pid;
-  const p=appData.find(x=>x.id===pid); if(!p) return;
-  const container=document.getElementById('tab-pacientes');
-  const s=calcStats(p);
-  const byPeriod={};
-  PERIODS.forEach(per=>byPeriod[per]=[]);
-  (p.vaccines||[]).forEach((v,vi)=>{ if(!byPeriod[v.period])byPeriod[v.period]=[]; byPeriod[v.period].push({...v,_vi:vi}); });
-  let vaccHtml='';
-  PERIODS.forEach(per=>{
-    const vs=byPeriod[per]; if(!vs.length) return;
-    const app2=vs.filter(v=>v.applied).length;
-    vaccHtml+=`<div class="period-group"><div class="period-head"><span>${per}</span><span>${app2}/${vs.length}</span></div><div class="period-body">`;
-    vs.forEach(v=>{
-      const today=new Date();
-      const dueDate=new Date(addMonths(p.dob,v.months)+'T12:00:00');
-      let cls2='',dotCls='pending';
-      if(v.na){cls2='na';dotCls='na';}
-      else if(v.applied){cls2='ok';dotCls='ok';}
-      else if(today>dueDate){cls2='late';dotCls='late';}
-      vaccHtml+=`<div class="vac-item ${cls2}" onclick="openVacModal('${p.id}',${v._vi})">
+  detailPid = pid;
+  const p = appData.find(x => x.id === pid);
+  if (!p) return;
+  const container = document.getElementById('tab-pacientes');
+  
+  // Oculta a barra de filtros
+  const filterBar = document.getElementById('patientsFilterBar');
+  if (filterBar) filterBar.style.display = 'none';
+  
+  const s = calcStats(p);
+  const byPeriod = {};
+  PERIODS.forEach(per => byPeriod[per] = []);
+  (p.vaccines || []).forEach((v, vi) => {
+    if (!byPeriod[v.period]) byPeriod[v.period] = [];
+    byPeriod[v.period].push({ ...v, _vi: vi });
+  });
+  let vaccHtml = '';
+  PERIODS.forEach(per => {
+    const vs = byPeriod[per];
+    if (!vs.length) return;
+    const app2 = vs.filter(v => v.applied).length;
+    vaccHtml += `<div class="period-group"><div class="period-head"><span>${per}</span><span>${app2}/${vs.length}</span></div><div class="period-body">`;
+    vs.forEach(v => {
+      const today = new Date();
+      const dueDate = new Date(addMonths(p.dob, v.months) + 'T12:00:00');
+      let cls2 = '', dotCls = 'pending';
+      if (v.na) { cls2 = 'na'; dotCls = 'na'; }
+      else if (v.applied) { cls2 = 'ok'; dotCls = 'ok'; }
+      else if (today > dueDate) { cls2 = 'late'; dotCls = 'late'; }
+      vaccHtml += `<div class="vac-item ${cls2}" onclick="openVacModal('${p.id}',${v._vi})">
         <div class="vac-dot ${dotCls}"></div>
-        <div><div class="vac-name">${v.name}</div><div class="vac-date">${v.applied?fmtDate(v.date):v.na?'N/A':today>dueDate?'⚠️ Atrasada':'Pendente'}</div></div>
+        <div><div class="vac-name">${v.name}</div><div class="vac-date">${v.applied ? fmtDate(v.date) : v.na ? 'N/A' : today > dueDate ? '⚠️ Atrasada' : 'Pendente'}</div></div>
       </div>`;
     });
-    vaccHtml+='</div></div>';
+    vaccHtml += '</div></div>';
   });
-  const vis=p.visits||{v1:{done:false,date:'',obs:''},v2:{done:false,date:'',obs:''}};
-  const d30=new Date(new Date(p.dob+'T12:00:00').getTime()+30*86400000).toISOString().slice(0,10);
-  const visitHtml=`<div class="visit-section">
+  const vis = p.visits || { v1: { done: false, date: '', obs: '' }, v2: { done: false, date: '', obs: '' } };
+  const d30 = new Date(new Date(p.dob + 'T12:00:00').getTime() + 30 * 86400000).toISOString().slice(0, 10);
+  const visitHtml = `<div class="visit-section">
     <div class="visit-title">🏠 Visitas domiciliares</div>
     <div class="visit-grid">
       <div class="visit-card">
         <div class="visit-label">1ª Visita — até 30 dias</div>
         <div style="font-size:12px;color:var(--s500)">Prazo: até ${fmtDate(d30)}</div>
         <div class="visit-status-row">
-          <input type="checkbox" class="visit-check" id="v1done" ${vis.v1.done?'checked':''} onchange="saveVisit('${p.id}','v1','done',this.checked)">
-          <label for="v1done" style="font-size:13px;font-weight:600;cursor:pointer">${vis.v1.done?'<span class=\'visit-done-badge\'>✅ Realizada</span>':'<span class=\'visit-pending-badge\'>⏳ Pendente</span>'}</label>
-          <input type="date" class="visit-date-input" value="${vis.v1.date||''}" onchange="saveVisit('${p.id}','v1','date',this.value)" style="max-width:160px">
+          <input type="checkbox" class="visit-check" id="v1done" ${vis.v1.done ? 'checked' : ''} onchange="saveVisit('${p.id}','v1','done',this.checked)">
+          <label for="v1done" style="font-size:13px;font-weight:600;cursor:pointer">${vis.v1.done ? '<span class=\'visit-done-badge\'>✅ Realizada</span>' : '<span class=\'visit-pending-badge\'>⏳ Pendente</span>'}</label>
+          <input type="date" class="visit-date-input" value="${vis.v1.date || ''}" onchange="saveVisit('${p.id}','v1','date',this.value)" style="max-width:160px">
         </div>
-        <textarea class="visit-obs" placeholder="Observações..." onchange="saveVisit('${p.id}','v1','obs',this.value)">${vis.v1.obs||''}</textarea>
+        <textarea class="visit-obs" placeholder="Observações..." onchange="saveVisit('${p.id}','v1','obs',this.value)">${vis.v1.obs || ''}</textarea>
       </div>
       <div class="visit-card">
         <div class="visit-label">2ª Visita — 30 dias a 6 meses</div>
         <div style="font-size:12px;color:var(--s500)">Período: 1 a 6 meses de vida</div>
         <div class="visit-status-row">
-          <input type="checkbox" class="visit-check" id="v2done" ${vis.v2.done?'checked':''} onchange="saveVisit('${p.id}','v2','done',this.checked)">
-          <label for="v2done" style="font-size:13px;font-weight:600;cursor:pointer">${vis.v2.done?'<span class=\'visit-done-badge\'>✅ Realizada</span>':'<span class=\'visit-pending-badge\'>⏳ Pendente</span>'}</label>
-          <input type="date" class="visit-date-input" value="${vis.v2.date||''}" onchange="saveVisit('${p.id}','v2','date',this.value)" style="max-width:160px">
+          <input type="checkbox" class="visit-check" id="v2done" ${vis.v2.done ? 'checked' : ''} onchange="saveVisit('${p.id}','v2','done',this.checked)">
+          <label for="v2done" style="font-size:13px;font-weight:600;cursor:pointer">${vis.v2.done ? '<span class=\'visit-done-badge\'>✅ Realizada</span>' : '<span class=\'visit-pending-badge\'>⏳ Pendente</span>'}</label>
+          <input type="date" class="visit-date-input" value="${vis.v2.date || ''}" onchange="saveVisit('${p.id}','v2','date',this.value)" style="max-width:160px">
         </div>
-        <textarea class="visit-obs" placeholder="Observações..." onchange="saveVisit('${p.id}','v2','obs',this.value)">${vis.v2.obs||''}</textarea>
+        <textarea class="visit-obs" placeholder="Observações..." onchange="saveVisit('${p.id}','v2','obs',this.value)">${vis.v2.obs || ''}</textarea>
       </div>
     </div>
   </div>`;
-  container.innerHTML=`<div class="card">
+  container.innerHTML = `<div class="card">
     <div class="dhead">
       <div class="dav">${initials(p.name)}</div>
       <div style="flex:1">
         <div class="dname">${p.name}</div>
-        <div class="dsub">Cód: ${p.code||'—'} · Nasc: ${fmtDate(p.dob)} · ${ageStr(p.dob)}${p.address?'<br>📍 '+p.address:''}</div>
+        <div class="dsub">Cód: ${p.code || '—'} · Nasc: ${fmtDate(p.dob)} · ${ageStr(p.dob)}${p.address ? '<br>📍 ' + p.address : ''}</div>
         <div class="dpct">${s.pct}% vacinado</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
@@ -1248,11 +1257,18 @@ function openPatientDetail(pid) {
     </div>
   </div>`;
 }
-function closeDetail(){
-  detailPid=null;
-  document.getElementById('tab-pacientes').innerHTML=`
+
+function closeDetail() {
+  detailPid = null;
+  // Restaura a barra de filtros
+  const filterBar = document.getElementById('patientsFilterBar');
+  if (filterBar) filterBar.style.display = 'flex';
+  
+  // Limpa o container de detalhes e reexibe a lista
+  const container = document.getElementById('tab-pacientes');
+  container.innerHTML = `
     <div class="card">
-      <div class="filter-bar">
+      <div class="filter-bar" id="patientsFilterBar" style="display:flex">
         <input type="text" placeholder="🔍 Buscar nome ou código..." id="searchInp" oninput="renderPatients()" style="flex:1;min-width:180px">
         <select id="filterStatus" onchange="renderPatients()">
           <option value="">Todos</option>
@@ -1265,7 +1281,6 @@ function closeDetail(){
     </div>`;
   renderPatients();
 }
-
 // ===================== VISIT =====================
 function saveVisit(pid,vkey,field,val) {
   const p=appData.find(x=>x.id===pid); if(!p) return;
