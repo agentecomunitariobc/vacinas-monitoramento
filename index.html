@@ -1003,8 +1003,11 @@ function navigateTo(tab) {
 // ===================== LOGIN =====================
 async function initLoginScreen() {
   users = await loadUsers();
-  // Garante que todos usuários têm campos email/senha
+  // Garante campos email/senha em todos os usuários
   users.forEach(u => { if(!u.email) u.email=''; if(!u.senha) u.senha=''; });
+  // Admin sempre tem e-mail padrão se não tiver sido alterado
+  const admin = users.find(u=>u.role==='admin');
+  if(admin && !admin.email) { admin.email='admin@vacinacontrol.app'; }
   renderFAGrid();
 }
 
@@ -1052,22 +1055,31 @@ function doLoginEmail() {
 
   if(!email || !senha) { errEl.textContent='Preencha e-mail e senha.'; return; }
 
-  // Admin: aceita email especial ou qualquer email com o PIN como senha
-  const adminUser = users.find(u=>u.role==='admin');
-  if(adminUser) {
-    // Admin pode entrar com o email cadastrado ou com PIN como senha
-    const isAdminEmail = adminUser.email && email === adminUser.email.toLowerCase();
-    const isAdminPin = senha === adminUser.pin;
-    if(isAdminEmail && isAdminPin) { loginAs(adminUser); return; }
-    if(isAdminEmail && adminUser.senha && senha === adminUser.senha) { loginAs(adminUser); return; }
+  // Busca qualquer usuário com esse e-mail (incluindo admin)
+  const user = users.find(u => u.email && u.email.toLowerCase()===email);
+
+  if(user) {
+    // Admin: aceita PIN ou senha cadastrada
+    if(user.role==='admin') {
+      if(senha === user.pin || (user.senha && senha === user.senha)) {
+        loginAs(user); return;
+      } else {
+        errEl.textContent='Senha incorreta. Use o PIN de administrador ou a senha cadastrada.'; return;
+      }
+    }
+    // ACS normal
+    if(!user.senha) { errEl.textContent='Senha não cadastrada. Use "Primeiro Acesso".'; return; }
+    if(user.senha !== senha) { errEl.textContent='Senha incorreta. Tente novamente.'; return; }
+    loginAs(user); return;
   }
 
-  // Usuário ACS — busca por email
-  const user = users.find(u => u.role!=='admin' && u.email && u.email.toLowerCase()===email);
-  if(!user) { errEl.textContent='E-mail não cadastrado. Use "Primeiro Acesso" para se cadastrar.'; return; }
-  if(!user.senha) { errEl.textContent='Senha não cadastrada. Use "Primeiro Acesso".'; return; }
-  if(user.senha !== senha) { errEl.textContent='Senha incorreta. Tente novamente.'; return; }
-  loginAs(user);
+  // Nenhum usuário com esse e-mail — pode ser o admin tentando com e-mail padrão
+  const adminUser = users.find(u=>u.role==='admin');
+  if(adminUser && email === (adminUser.email||'').toLowerCase() && senha === adminUser.pin) {
+    loginAs(adminUser); return;
+  }
+
+  errEl.textContent='E-mail não cadastrado. Use "Primeiro Acesso" para se cadastrar.';
 }
 
 function doFirstAccess() {
